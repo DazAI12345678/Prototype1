@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>ARK — Ocean Biome</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07131a;font-family:Arial,sans-serif;color:white;touch-action:none}
+canvas{display:block}
+
+#hud{
+ position:fixed;inset:0;pointer-events:none;z-index:10;
+}
+#top{
+ position:absolute;top:14px;left:14px;width:270px;
+ background:rgba(4,15,21,.72);padding:12px;border-radius:12px;
+ backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15)
+}
+.title{font-weight:bold;font-size:15px;margin-bottom:7px}
+.task{font-size:12px;margin:5px 0;color:#ddd}
+.done{color:#63e6a2;text-decoration:line-through}
+.bar{height:7px;background:#17252c;border-radius:5px;overflow:hidden;margin-top:3px}
+.fill{height:100%;width:100%;transition:.2s}
+#healthFill{background:#f06a6a}
+#oxygenFill{background:#56b9ff}
+#biomeFill{background:#67dc8e}
+
+#status{
+ position:absolute;top:14px;right:14px;
+ background:rgba(4,15,21,.72);padding:10px 13px;border-radius:12px;
+ font-size:12px;text-align:right
+}
+
+#crosshair{
+ position:absolute;left:50%;top:50%;width:8px;height:8px;
+ transform:translate(-50%,-50%);border:1px solid white;border-radius:50%;
+ opacity:.8
+}
+
+#interact{
+ position:absolute;left:50%;bottom:27%;transform:translateX(-50%);
+ padding:10px 18px;border-radius:20px;background:rgba(0,0,0,.65);
+ display:none;font-size:12px
+}
+
+#joystick{
+ position:absolute;left:25px;bottom:30px;width:125px;height:125px;
+ border-radius:50%;background:rgba(255,255,255,.09);
+ border:1px solid rgba(255,255,255,.18);pointer-events:auto
+}
+#stick{
+ position:absolute;width:52px;height:52px;left:36px;top:36px;
+ border-radius:50%;background:rgba(255,255,255,.22);
+ border:1px solid rgba(255,255,255,.3)
+}
+
+.btn{
+ position:absolute;width:58px;height:58px;border-radius:50%;
+ border:1px solid rgba(255,255,255,.3);
+ background:rgba(5,18,25,.68);color:white;
+ display:flex;align-items:center;justify-content:center;
+ font-weight:bold;font-size:11px;pointer-events:auto
+}
+#lookL{right:160px;bottom:94px}
+#lookR{right:90px;bottom:94px}
+#up{right:90px;bottom:164px}
+#down{right:90px;bottom:24px}
+#action{right:22px;bottom:94px;background:rgba(36,126,99,.75)}
+#shopBtn{right:22px;bottom:164px}
+#settingsBtn{right:22px;top:78px;width:42px;height:42px}
+
+#start,#settings,#shop,#message{
+ position:fixed;z-index:30;inset:0;display:flex;
+ align-items:center;justify-content:center;background:rgba(2,10,14,.88);
+}
+.panel{
+ width:min(92%,520px);max-height:90vh;overflow:auto;
+ padding:25px;border-radius:18px;background:#10222a;
+ border:1px solid rgba(255,255,255,.18);
+ box-shadow:0 20px 80px #000
+}
+h1{margin:0 0 8px;font-size:30px}
+h2{margin:0 0 15px}
+p{color:#b8c8ce;line-height:1.5}
+.big{
+ display:block;width:100%;padding:14px;margin-top:12px;
+ border:0;border-radius:12px;background:#62c99b;color:#06130e;
+ font-weight:bold;font-size:15px
+}
+.option{
+ width:100%;padding:12px;margin:6px 0;border-radius:10px;
+ border:1px solid #45606a;background:#162c35;color:white
+}
+.option.active{border-color:#67dcaa;background:#21453c}
+.item{
+ display:flex;justify-content:space-between;align-items:center;
+ padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08)
+}
+.buy{padding:7px 11px;border:0;border-radius:8px;background:#69cfa3}
+.close{background:#394c54;color:white}
+.hidden{display:none!important}
+
+#zone{
+ position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+ background:rgba(0,0,0,.45);padding:7px 14px;border-radius:15px;
+ font-size:12px
+}
+
+#damage{
+ position:fixed;inset:0;z-index:15;background:rgba(255,0,0,.18);
+ pointer-events:none;opacity:0;transition:.15s
+}
+</style>
+</head>
+
+<body>
+
+<div id="start">
+ <div class="panel">
+  <h1>ARK: OCEAN BIOME</h1>
+  <p>
+   Earth is gone. The Ark preserves the last surviving ecosystems.
+   Enter the Ocean Biome and restore the reef before the ecosystem collapses.
+  </p>
+  <button class="big" id="startBtn">ENTER ARK</button>
+ </div>
+</div>
+
+<div id="settings" class="hidden">
+ <div class="panel">
+  <h2>GRAPHICS</h2>
+  <p>Higher settings add more fish, coral, particles, shadows and atmosphere.</p>
+  <button class="option" data-quality="low">LOW</button>
+  <button class="option" data-quality="medium">MEDIUM</button>
+  <button class="option active" data-quality="high">HIGH</button>
+  <button class="option" data-quality="ultra">ULTRA</button>
+  <button class="option close" id="closeSettings">CLOSE</button>
+ </div>
+</div>
+
+<div id="shop" class="hidden">
+ <div class="panel">
+  <h2>ARK BAZAAR</h2>
+  <p>Credits: <b id="credits">500</b></p>
+  <div id="shopItems"></div>
+  <button class="option close" id="closeShop">CLOSE</button>
+ </div>
+</div>
+
+<div id="message" class="hidden">
+ <div class="panel">
+  <h2 id="messageTitle"></h2>
+  <p id="messageText"></p>
+  <button class="big" id="messageBtn">CONTINUE</button>
+ </div>
+</div>
+
+<div id="hud">
+ <div id="top">
+  <div class="title">OCEAN BIOME — RESTORATION</div>
+
+  <div class="task" id="tTrash">□ Remove beach trash</div>
+  <div class="task" id="tWater">□ Check water-level monitor</div>
+  <div class="task" id="tCoral">□ Restore damaged coral</div>
+  <div class="task" id="tReef">□ Stabilise ecosystem</div>
+
+  <div style="margin-top:9px">HEALTH</div>
+  <div class="bar"><div id="healthFill" class="fill"></div></div>
+
+  <div style="margin-top:6px">OXYGEN</div>
+  <div class="bar"><div id="oxygenFill" class="fill"></div></div>
+
+  <div style="margin-top:6px">BIOME HEALTH</div>
+  <div class="bar"><div id="biomeFill" class="fill"></div></div>
+ </div>
+
+ <div id="status">
+  <b id="zoneText">ARK HUB</b><br>
+  Credits: <span id="creditHUD">500</span><br>
+  Depth: <span id="depth">0</span>m
+ </div>
+
+ <div id="crosshair"></div>
+ <div id="interact">INTERACT</div>
+ <div id="zone">ARK HUB</div>
+</div>
+
+<div id="damage"></div>
+
+<div id="joystick"><div id="stick"></div></div>
+
+<button class="btn" id="lookL">◀</button>
+<button class="btn" id="lookR">▶</button>
+<button class="btn" id="up">▲</button>
+<button class="btn" id="down">▼</button>
+<button class="btn" id="action">USE</button>
+<button class="btn" id="shopBtn">SHOP</button>
+<button class="btn" id="settingsBtn">⚙</button>
+
+<script>
+/* =========================================================
+   ARK OCEAN — SINGLE FILE GAME
+   ========================================================= */
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071a21);
+scene.fog = new THREE.FogExp2(0x071a21,0.009);
+
+const camera = new THREE.PerspectiveCamera(
+ 72,innerWidth/innerHeight,.05,2500
+);
+
+const renderer = new THREE.WebGLRenderer({
+ antialias:true,
+ powerPreference:"high-performance"
+});
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+/* -----------------------------
+   GAME STATE
+----------------------------- */
+
+const state={
+ started:false,
+ zone:"ARK HUB",
+ health:100,
+ oxygen:100,
+ biome:100,
+ credits:500,
+ quality:"high",
+ underwater:false,
+ speed:0,
+ trash:0,
+ trashTotal:25,
+ water:false,
+ coral:0,
+ coralTotal:6,
+ reef:false,
+ dead:false,
+ time:0
+};
+
+const inventory={
+ food:0,
+ medkits:0,
+ oxygenTanks:0,
+ storage:0,
+ fins:0,
+ coralTools:0,
+ decorations:0
+};
+
+const quality={
+ low:{ratio:.8,fish:12,coral:10,kelp:15,particles:0,shadow:false},
+ medium:{ratio:1,fish:25,coral:20,kelp:28,particles:15,shadow:true},
+ high:{ratio:1.5,fish:45,coral:35,kelp:45,particles:35,shadow:true},
+ ultra:{ratio:2,fish:75,coral:65,kelp:70,particles:80,shadow:true}
+};
+
+/* -----------------------------
+   LIGHTING
+----------------------------- */
+
+const hemi=new THREE.HemisphereLight(0x9ddfff,0x17332d,1.5);
+scene.add(hemi);
+
+const sun=new THREE.DirectionalLight(0xffe4ba,2.2);
+sun.position.set(-80,130,80);
+sun.castShadow=true;
+scene.add(sun);
+
+const moon=new THREE.DirectionalLight(0x6da4c8,.25);
+moon.position.set(50,80,-100);
+scene.add(moon);
+
+/* -----------------------------
+   MATERIALS
+----------------------------- */
+
+const mat=(color,rough=.8)=>{
+ return new THREE.MeshStandardMaterial({
+  color,
+  roughness:rough,
+  flatShading:true
+ });
+};
+
+const sandMat=mat(0xd5bd82);
+const rockMat=mat(0x596c6d);
+const woodMat=mat(0x61462f);
+const metalMat=mat(0x53636a);
+const darkMetal=mat(0x202c31);
+const coralMat=mat(0xed766d);
+const coral2Mat=mat(0xd887c8);
+const kelpMat=mat(0x397d5d);
+
+/* -----------------------------
+   HELPERS
+----------------------------- */
+
+function cube(x,y,z,sx,sy,sz,material,group=scene){
+ const m=new THREE.Mesh(
+  new THREE.BoxGeometry(sx,sy,sz),
+  material
+ );
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ m.receiveShadow=true;
+ group.add(m);
+ return m;
+}
+
+function sphere(x,y,z,r,material,group=scene){
+ const m=new THREE.Mesh(
+  new THREE.IcosahedronGeometry(r,1),
+  material
+ );
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ m.receiveShadow=true;
+ group.add(m);
+ return m;
+}
+
+function cylinder(x,y,z,r1,r2,h,material,group=scene){
+ const m=new THREE.Mesh(
+  new THREE.CylinderGeometry(r1,r2,h,8),
+  material
+ );
+ m.position.set(x,y,z);
+ m.castShadow=true;
+ m.receiveShadow=true;
+ group.add(m);
+ return m;
+}
+
+/* -----------------------------
+   WORLD GROUPS
+----------------------------- */
+
+const hub=new THREE.Group();
+const corridor=new THREE.Group();
+const ocean=new THREE.Group();
+
+scene.add(hub,corridor,ocean);
+
+/* =========================================================
+   ARK HUB
+========================================================= */
+
+cube(0,-1,65,44,2,36,darkMetal,hub);
+
+cube(0,8,47,44,18,2,darkMetal,hub);
+cube(-21,8,65,2,18,36,darkMetal,hub);
+cube(21,8,65,2,18,36,darkMetal,hub);
+cube(0,20,65,44,2,36,darkMetal,hub);
+
+/* ceiling lights */
+for(let x=-15;x<=15;x+=7.5){
+ const light=new THREE.PointLight(0x9fe4ff,1.2,18);
+ light.position.set(x,14,63);
+ hub.add(light);
+ cube(x,15,63,.5,.2,5,mat(0x8dd8e8),hub);
+}
+
+/* Ark central tree */
+const tree=new THREE.Group();
+cylinder(0,5,65,1.4,1.8,10,woodMat,tree);
+for(let i=0;i<10;i++){
+ const a=i*Math.PI*2/10;
+ sphere(Math.cos(a)*4,11+Math.random()*3,65+Math.sin(a)*4,3.5,mat(0x47785b),tree);
+}
+hub.add(tree);
+
+/* Bazaar stalls */
+function makeStall(x,z,label){
+ const g=new THREE.Group();
+ cube(x,2,z,6,4,4,woodMat,g);
+ cube(x,5,z,7,.7,5,mat(0x273e42),g);
+ cube(x,4.8,z-2.1,5,.15,.15,mat(0xd9b66e),g);
+
+ const sign=cube(x,6,z,4,1,.2,mat(0x8bc4b0),g);
+ g.userData.bazaar=true;
+ g.userData.label=label;
+ hub.add(g);
+ return g;
+}
+
+makeStall(-12,58,"EQUIPMENT");
+makeStall(-4,58,"MEDICAL");
+makeStall(4,58,"FOOD");
+makeStall(12,58,"ARK SUPPLY");
+
+/* hallway */
+cube(0,-1,30,18,2,35,darkMetal,corridor);
+cube(-9,7,30,2,16,35,darkMetal,corridor);
+cube(9,7,30,2,16,35,darkMetal,corridor);
+cube(0,15,30,18,2,35,darkMetal,corridor);
+
+/* biome doors */
+const doors=[];
+
+function biomeDoor(z,name,enabled=false){
+ const g=new THREE.Group();
+ cube(0,6,z,10,12,.8,metalMat,g);
+ cube(0,6,z-.5,6,8,.6,darkMetal,g);
+ cube(-3.7,6,z-1,1,8,.8,mat(0x182327),g);
+ cube(3.7,6,z-1,1,8,.8,mat(0x182327),g);
+ g.userData.name=name;
+ g.userData.enabled=enabled;
+ doors.push(g);
+ corridor.add(g);
+}
+
+biomeDoor(43,"ARK HUB",true);
+biomeDoor(30,"OCEAN BIOME",true);
+biomeDoor(17,"TUNDRA",false);
+biomeDoor(4,"FOREST",false);
+
+/* =========================================================
+   OCEAN ENVIRONMENT
+========================================================= */
+
+/* Beach */
+cube(0,-1,2,150,2,110,sandMat,ocean);
+
+/* forest edge */
+for(let i=0;i<45;i++){
+ const x=(Math.random()-.5)*130;
+ const z=27+Math.random()*25;
+ cylinder(x,4,z,.5,.8,9,woodMat,ocean);
+
+ for(let j=0;j<5;j++){
+  sphere(
+   x+(Math.random()-.5)*3,
+   8+Math.random()*3,
+   z+(Math.random()-.5)*3,
+   2+Math.random()*1.5,
+   mat(0x315d48),
+   ocean
+  );
+ }
+}
+
+/* beach rocks */
+for(let i=0;i<45;i++){
+ const x=(Math.random()-.5)*120;
+ const z=5+Math.random()*35;
+ sphere(x,.8,z,1+Math.random()*3,rockMat,ocean);
+}
+
+/* water surface */
+const waterGeo=new THREE.PlaneGeometry(150,170,45,45);
+waterGeo.rotateX(-Math.PI/2);
+
+const waterMat=new THREE.MeshPhysicalMaterial({
+ color:0x168fa0,
+ transparent:true,
+ opacity:.58,
+ roughness:.15,
+ metalness:0,
+ transmission:.05
+});
+
+const water=new THREE.Mesh(waterGeo,waterMat);
+water.position.set(0,0,-42);
+ocean.add(water);
+
+const waterBase=water.geometry.attributes.position.array.slice();
+
+/* underwater terrain */
+const seabed=cube(0,-22,-75,150,2,120,mat(0x536c5c),ocean);
+
+/* deep cliffs */
+for(let i=0;i<35;i++){
+ const x=(Math.random()-.5)*130;
+ const z=-60-Math.random()*65;
+ const h=5+Math.random()*18;
+ sphere(x,-h/2,z,4+Math.random()*6,rockMat,ocean);
+}
+
+/* dock */
+const dock=new THREE.Group();
+for(let x=-8;x<=8;x+=4) cube(x,2,-8,3,.6,18,woodMat,dock);
+for(let x=-8;x<=8;x+=4){
+ cylinder(x,-1,-4,.3,.3,6,woodMat,dock);
+ cylinder(x,-1,-12,.3,.3,6,woodMat,dock);
+}
+cube(0,4,-16,20,1,2,woodMat,dock);
+ocean.add(dock);
+
+/* water monitor */
+const monitor=new THREE.Group();
+cube(10,4,-8,2,4,1,metalMat,monitor);
+cube(10,5,-7.45,1.4,1.6,.08,mat(0x54d5e0),monitor);
+monitor.userData.interactable=true;
+monitor.userData.type="water";
+ocean.add(monitor);
+
+/* beach trash */
+const trash=[];
+for(let i=0;i<25;i++){
+ const g=new THREE.Group();
+ g.position.set(
+  (Math.random()-.5)*75,
+  .3,
+  -2+Math.random()*35
+ );
+ sphere(0,0,0,.35+Math.random()*.25,mat(
+  [0xd65e55,0xe3d18a,0x5a9fd1,0x777777][i%4]
+ ),g);
+ g.userData.interactable=true;
+ g.userData.type="trash";
+ g.userData.cleaned=false;
+ trash.push(g);
+ ocean.add(g);
+}
+
+/* coral */
+const corals=[];
+for(let i=0;i<quality.high.coral;i++){
+ const g=new THREE.Group();
+ const x=(Math.random()-.5)*70;
+ const z=-28-Math.random()*65;
+ const damaged=i<6;
+ g.position.set(x,-2-Math.random()*3,z);
+
+ for(let j=0;j<4;j++){
+  const h=1+Math.random()*3;
+  cylinder(
+   (Math.random()-.5)*1.8,
+   h/2,
+   (Math.random()-.5)*1.8,
+   .15,.3,h,
+   damaged?mat(0x515858):(j%2?coralMat:coral2Mat),
+   g
+  );
+ }
+ g.userData.type=damaged?"coralDamaged":"coral";
+ g.userData.restored=!damaged;
+ corals.push(g);
+ ocean.add(g);
+}
+
+/* kelp */
+const kelp=[];
+for(let i=0;i<70;i++){
+ const x=(Math.random()-.5)*100;
+ const z=-30-Math.random()*100;
+ const h=3+Math.random()*7;
+ const g=cylinder(x,-20+h/2,z,.12,.35,h,kelpMat,ocean);
+ g.rotation.z=(Math.random()-.5)*.25;
+ kelp.push(g);
+}
+
+/* =========================================================
+   FISH
+========================================================= */
+
+const fish=[];
+const fishMats=[
+ mat(0xf0aa52),mat(0x5eb7d6),mat(0xe76b6b),
+ mat(0xd7c96d),mat(0xa68bd6)
+];
+
+function makeFish(i){
+ const g=new THREE.Group();
+ const body=new THREE.Mesh(
+  new THREE.IcosahedronGeometry(.8+Math.random()*.5,1),
+  fishMats[i%fishMats.length]
+ );
+ g.add(body);
+
+ const tail=new THREE.Mesh(
+  new THREE.ConeGeometry(.55,.9,5),
+  fishMats[i%fishMats.length]
+ );
+ tail.rotation.z=Math.PI/2;
+ tail.position.x=-.9;
+ g.add(tail);
+
+ g.position.set(
+  (Math.random()-.5)*100,
+  -3-Math.random()*25,
+  -25-Math.random()*100
+ );
+
+ g.userData={
+  phase:Math.random()*10,
+  speed:.7+Math.random()*1.2,
+  dir:new THREE.Vector3(
+   Math.random()-.5,
+   (Math.random()-.5)*.15,
+   Math.random()-.5
+  ).normalize()
+ };
+
+ fish.push(g);
+ ocean.add(g);
+}
+
+/* =========================================================
+   SHARK
+========================================================= */
+
+const shark=new THREE.Group();
+
+const sharkBody=new THREE.Mesh(
+ new THREE.IcosahedronGeometry(7,1),
+ mat(0x52656b)
+);
+shark.add(sharkBody);
+
+const sharkNose=new THREE.Mesh(
+ new THREE.ConeGeometry(3,9,8),
+ mat(0x52656b)
+);
+sharkNose.rotation.z=-Math.PI/2;
+sharkNose.position.x=7;
+shark.add(sharkNose);
+
+const fin=cube(0,4,0,2,5,5,mat(0x46585d),shark);
+fin.rotation.z=.2;
+
+const tail=new THREE.Mesh(
+ new THREE.ConeGeometry(4,7,5),
+ mat(0x52656b)
+);
+tail.rotation.z=Math.PI/2;
+tail.position.x=-8;
+shark.add(tail);
+
+shark.position.set(0,-14,-95);
+ocean.add(shark);
+
+const sharkState={
+ mode:"patrol",
+ target:new THREE.Vector3(),
+ cooldown:0,
+ alert:0
+};
+
+/* =========================================================
+   PLAYER
+========================================================= */
+
+const player={
+ pos:new THREE.Vector3(0,3,50),
+ vel:new THREE.Vector3(),
+ yaw:0,
+ pitch:0,
+ onGround:true
+};
+
+camera.position.copy(player.pos);
+
+const hands=new THREE.Group();
+camera.add(hands);
+
+/* visible stylised hands */
+const armMat=mat(0xb98265);
+const sleeveMat=mat(0x273d45);
+
+const leftArm=cube(-.42,-.48,-1.05,.22,.22,.9,sleeveMat,hands);
+leftArm.rotation.z=-.3;
+
+const rightArm=cube(.42,-.48,-1.05,.22,.22,.9,sleeveMat,hands);
+rightArm.rotation.z=.3;
+
+const leftHand=sphere(-.48,-.72,-1.45,.22,armMat,hands);
+const rightHand=sphere(.48,-.72,-1.45,.22,armMat,hands);
+
+/* =========================================================
+   CONTROLS
+========================================================= */
+
+const keys={};
+
+addEventListener("keydown",e=>{
+ keys[e.code]=true;
+ if(e.code==="KeyE") interact();
+ if(e.code==="KeyB") openShop();
+ if(e.code==="Escape"){
+  document.getElementById("settings").classList.add("hidden");
+  document.getElementById("shop").classList.add("hidden");
+ }
+});
+
+addEventListener("keyup",e=>keys[e.code]=false);
+
+let joy={x:0,y:0,active:false};
+
+const joystick=document.getElementById("joystick");
+const stick=document.getElementById("stick");
+
+function joyMove(e){
+ const r=joystick.getBoundingClientRect();
+ const cx=r.left+r.width/2;
+ const cy=r.top+r.height/2;
+ let dx=e.clientX-cx;
+ let dy=e.clientY-cy;
+ const max=42;
+ const len=Math.hypot(dx,dy);
+ if(len>max){
+  dx*=max/len;
+  dy*=max/len;
+ }
+ joy.x=dx/max;
+ joy.y=dy/max;
+ stick.style.transform=`translate(${dx}px,${dy}px)`;
+}
+
+joystick.addEventListener("pointerdown",e=>{
+ joy.active=true;
+ joystick.setPointerCapture(e.pointerId);
+ joyMove(e);
+});
+
+joystick.addEventListener("pointermove",e=>{
+ if(joy.active)joyMove(e);
+});
+
+joystick.addEventListener("pointerup",()=>{
+ joy.active=false;
+ joy.x=joy.y=0;
+ stick.style.transform="";
+});
+
+/* look buttons */
+function holdButton(id,code){
+ const b=document.getElementById(id);
+ b.addEventListener("pointerdown",()=>keys[code]=true);
+ b.addEventListener("pointerup",()=>keys[code]=false);
+ b.addEventListener("pointercancel",()=>keys[code]=false);
+}
+holdButton("lookL","ArrowLeft");
+holdButton("lookR","ArrowRight");
+holdButton("up","Space");
+holdButton("down","ShiftLeft");
+
+document.getElementById("action").addEventListener("pointerdown",interact);
+
+/* swipe look */
+let lookStart=null;
+
+renderer.domElement.addEventListener("pointerdown",e=>{
+ if(e.clientX<180)return;
+ lookStart={x:e.clientX,y:e.clientY};
+});
+
+renderer.domElement.addEventListener("pointermove",e=>{
+ if(!lookStart)return;
+ const dx=e.clientX-lookStart.x;
+ const dy=e.clientY-lookStart.y;
+
+ player.yaw-=dx*.003;
+ player.pitch-=dy*.0025;
+ player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch));
+
+ lookStart={x:e.clientX,y:e.clientY};
+});
+
+renderer.domElement.addEventListener("pointerup",()=>lookStart=null);
+
+/* =========================================================
+   INTERACTION
+========================================================= */
+
+const raycaster=new THREE.Raycaster();
+const center=new THREE.Vector2(0,0);
+
+function getTarget(){
+ raycaster.setFromCamera(center,camera);
+ const hits=raycaster.intersectObjects(scene.children,true);
+
+ for(const h of hits){
+  let o=h.object;
+  while(o){
+   if(o.userData && o.userData.interactable)return o;
+   o=o.parent;
+  }
+ }
+ return null;
+}
+
+function interact(){
+ if(!state.started || state.dead)return;
+
+ const target=getTarget();
+
+ if(target){
+  if(target.userData.type==="trash"){
+   if(!target.userData.cleaned){
+    target.userData.cleaned=true;
+    target.visible=false;
+    state.trash++;
+    state.credits+=5;
+    updateHUD();
+   }
+  }
+
+  if(target.userData.type==="water"){
+   state.water=true;
+   state.credits+=25;
+   updateHUD();
+   flashMessage("WATER MONITOR","Water level is stable.");
+  }
+
+  if(target.userData.type==="coralDamaged"){
+   target.userData.type="coral";
+   target.userData.restored=true;
+   target.children.forEach(c=>{
+    c.material=c.material.clone();
+    c.material.color.setHex(0xe97882);
+   });
+   state.coral++;
+   state.credits+=20;
+   updateHUD();
+  }
+ }
+}
+
+/* =========================================================
+   BAZAAR
+========================================================= */
+
+const shopItems=[
+ ["food","Food Pack",40,"food"],
+ ["medkits","Medical Kit",80,"medkits"],
+ ["oxygenTanks","Oxygen Tank",120,"oxygenTanks"],
+ ["storage","Backpack Upgrade",150,"storage"],
+ ["fins","Diving Fins",180,"fins"],
+ ["coralTools","Advanced Coral Tool",200,"coralTools"],
+ ["decorations","Ark Decoration",100,"decorations"]
+];
+
+function buildShop(){
+ const el=document.getElementById("shopItems");
+ el.innerHTML="";
+
+ shopItems.forEach(item=>{
+  const row=document.createElement("div");
+  row.className="item";
+
+  row.innerHTML=`
+   <div>
+    <b>${item[1]}</b><br>
+    <small>${item[2]} credits</small>
+   </div>
+   <button class="buy">BUY</button>
+  `;
+
+  row.querySelector("button").onclick=()=>{
+   if(state.credits>=item[2]){
+    state.credits-=item[2];
+    inventory[item[3]]++;
+    updateHUD();
+   }
+  };
+
+  el.appendChild(row);
+ });
+}
+
+function openShop(){
+ if(!state.started)return;
+ document.getElementById("shop").classList.remove("hidden");
+ buildShop();
+}
+
+document.getElementById("shopBtn").onclick=openShop;
+document.getElementById("closeShop").onclick=()=>{
+ document.getElementById("shop").classList.add("hidden");
+};
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+document.getElementById("settingsBtn").onclick=()=>{
+ document.getElementById("settings").classList.remove("hidden");
+};
+
+document.getElementById("closeSettings").onclick=()=>{
+ document.getElementById("settings").classList.add("hidden");
+};
+
+document.querySelectorAll("[data-quality]").forEach(b=>{
+ b.onclick=()=>{
+  state.quality=b.dataset.quality;
+  document.querySelectorAll("[data-quality]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  applyQuality();
+ };
+});
+
+function applyQuality(){
+ const q=quality[state.quality];
+
+ renderer.setPixelRatio(Math.min(devicePixelRatio,q.ratio));
+ renderer.shadowMap.enabled=q.shadow;
+
+ /* hide/show some environment detail */
+ fish.forEach((f,i)=>{
+  f.visible=i<q.fish;
+ });
+
+ corals.forEach((c,i)=>{
+  c.visible=i<q.coral;
+ });
+
+ kelp.forEach((k,i)=>{
+  k.visible=i<q.kelp;
+ });
+}
+
+/* =========================================================
+   HUD
+========================================================= */
+
+function updateHUD(){
+ document.getElementById("healthFill").style.width=state.health+"%";
+ document.getElementById("oxygenFill").style.width=state.oxygen+"%";
+ document.getElementById("biomeFill").style.width=state.biome+"%";
+
+ document.getElementById("credits").textContent=state.credits;
+ document.getElementById("creditHUD").textContent=state.credits;
+
+ document.getElementById("tTrash").className=
+  "task "+(state.trash>=state.trashTotal?"done":"");
+ document.getElementById("tTrash").textContent=
+  (state.trash>=state.trashTotal?"✓":"□")+" Remove beach trash "+
+  state.trash+"/"+state.trashTotal;
+
+ document.getElementById("tWater").className=
+  "task "+(state.water?"done":"");
+ document.getElementById("tWater").textContent=
+  (state.water?"✓":"□")+" Check water-level monitor";
+
+ document.getElementById("tCoral").className=
+  "task "+(state.coral>=state.coralTotal?"done":"");
+ document.getElementById("tCoral").textContent=
+  (state.coral>=state.coralTotal?"✓":"□")+" Restore damaged coral "+
+  state.coral+"/"+state.coralTotal;
+
+ const reefDone=
+  state.trash>=state.trashTotal &&
+  state.water &&
+  state.coral>=state.coralTotal;
+
+ state.reef=reefDone;
+
+ document.getElementById("tReef").className=
+  "task "+(reefDone?"done":"");
+ document.getElementById("tReef").textContent=
+  (reefDone?"✓":"□")+" Stabilise ecosystem";
+}
+
+function updateZone(){
+ let z="ARK HUB";
+
+ if(player.pos.z<46 && player.pos.z>18)z="BIOME HALLWAY";
+ if(player.pos.z<=18 && player.pos.z>-18)z="BEACH";
+ if(player.pos.z<=-18)z="OCEAN";
+
+ state.zone=z;
+
+ document.getElementById("zoneText").textContent=z;
+ document.getElementById("zone").textContent=z;
+
+ const depth=Math.max(0,Math.round(-player.pos.y));
+ document.getElementById("depth").textContent=depth;
+}
+
+/* =========================================================
+   MESSAGE
+========================================================= */
+
+function flashMessage(title,text){
+ document.getElementById("messageTitle").textContent=title;
+ document.getElementById("messageText").textContent=text;
+ document.getElementById("message").classList.remove("hidden");
+}
+
+document.getElementById("messageBtn").onclick=()=>{
+ document.getElementById("message").classList.add("hidden");
+};
+
+/* =========================================================
+   START
+========================================================= */
+
+document.getElementById("startBtn").onclick=()=>{
+ state.started=true;
+ document.getElementById("start").classList.add("hidden");
+};
+
+/* =========================================================
+   PLAYER PHYSICS
+========================================================= */
+
+function updatePlayer(dt){
+
+ if(!state.started || state.dead)return;
+
+ const underwater=player.pos.z<=-18 && player.pos.y<1;
+ state.underwater=underwater;
+
+ let forward=0;
+ let strafe=0;
+
+ if(keys.KeyW)forward+=1;
+ if(keys.KeyS)forward-=1;
+ if(keys.KeyD)strafe+=1;
+ if(keys.KeyA)strafe-=1;
+
+ forward-=joy.y;
+ strafe+=joy.x;
+
+ const f=new THREE.Vector3(
+  -Math.sin(player.yaw),
+  0,
+  -Math.cos(player.yaw)
+ );
+
+ const r=new THREE.Vector3(
+  Math.cos(player.yaw),
+  0,
+  -Math.sin(player.yaw)
+ );
+
+ const move=new THREE.Vector3();
+
+ move.addScaledVector(f,forward);
+ move.addScaledVector(r,strafe);
+
+ if(move.length()>1)move.normalize();
+
+ const speed=underwater?4.5:6.5;
+
+ if(underwater){
+
+  move.multiplyScalar(speed);
+
+  if(keys.Space)move.y+=speed;
+  if(keys.ShiftLeft)move.y-=speed;
+
+  player.vel.lerp(move,.12);
+  player.pos.addScaledVector(player.vel,dt);
+
+  player.pos.y=Math.max(-115,Math.min(5,player.pos.y));
+
+ }else{
+
+  player.vel.x=move.x*speed;
+  player.vel.z=move.z*speed;
+
+  player.pos.x+=player.vel.x*dt;
+  player.pos.z+=player.vel.z*dt;
+
+  /* keep player in world */
+  player.pos.x=Math.max(-68,Math.min(68,player.pos.x));
+
+  /* ground height */
+  let ground=3;
+
+  if(player.pos.z<-18){
+   const d=Math.min(1,(-player.pos.z-18)/100);
+   ground=2-d*22;
+  }
+
+  player.pos.y=ground;
+ }
+
+ /* boundaries around hub */
+ if(player.pos.z>78)player.pos.z=78;
+
+ /* rotation */
+ if(keys.ArrowLeft)player.yaw+=1.5*dt;
+ if(keys.ArrowRight)player.yaw-=1.5*dt;
+
+ /* camera */
+ camera.position.copy(player.pos);
+ camera.rotation.order="YXZ";
+ camera.rotation.y=player.yaw;
+ camera.rotation.x=player.pitch;
+
+ /* hand animation */
+ const moving=move.length()>.05;
+ const bob=moving?Math.sin(state.time*10)*.025:0;
+
+ if(underwater){
+  leftArm.rotation.x=Math.sin(state.time*4)*.25;
+  rightArm.rotation.x=-Math.sin(state.time*4)*.25;
+  hands.position.y=Math.sin(state.time*2)*.03;
+ }else{
+  hands.position.y=bob;
+ }
+
+ state.speed=player.vel.length();
+}
+
+/* =========================================================
+   OXYGEN
+========================================================= */
+
+function updateOxygen(dt){
+
+ if(state.underwater){
+  state.oxygen-=dt*(inventory.oxygenTanks>0?.7:2.2);
+
+  if(state.oxygen<=0){
+   state.oxygen=0;
+   state.health-=dt*7;
+  }
+ }else{
+  state.oxygen+=dt*18;
+ }
+
+ state.oxygen=Math.max(0,Math.min(100,state.oxygen));
+}
+
+/* =========================================================
+   BIOME HEALTH
+========================================================= */
+
+function updateBiome(dt){
+
+ if(!state.started)return;
+
+ /* ecosystem naturally degrades */
+ let rate=.07;
+
+ if(state.reef)rate=.015;
+
+ state.biome-=dt*rate;
+
+ state.biome=Math.max(0,state.biome);
+
+ if(state.biome<=0 && !state.dead){
+  die("THE OCEAN ECOSYSTEM COLLAPSED",
+      "The biome health reached zero. The Ark needs a stronger restoration effort.");
+ }
+}
+
+/* =========================================================
+   SHARK AI
+========================================================= */
+
+function updateShark(dt){
+
+ if(!state.started)return;
+
+ sharkState.cooldown-=dt;
+
+ const dist=shark.position.distanceTo(player.pos);
+
+ /* movement/noise detection */
+ const movementNoise=Math.min(1,state.speed/7);
+ const distanceFactor=Math.max(0,1-dist/90);
+
+ /* line-of-sight approximation */
+ const toPlayer=new THREE.Vector3().subVectors(player.pos,shark.position).normalize();
+ const forward=new THREE.Vector3(1,0,0).applyQuaternion(shark.quaternion);
+ const visibility=Math.max(0,forward.dot(toPlayer));
+
+ const detection=
+  distanceFactor*.45+
+  movementNoise*.25+
+  Math.max(0,visibility)*.3;
+
+ if(dist<75 && detection>.32){
+  sharkState.mode="hunt";
+ }else if(dist>110){
+  sharkState.mode="patrol";
+ }
+
+ if(sharkState.mode==="hunt"){
+
+  sharkState.target.copy(player.pos);
+
+  const dir=new THREE.Vector3()
+   .subVectors(sharkState.target,shark.position);
+
+  if(dir.length()>0.1){
+
+   dir.normalize();
+
+   shark.position.addScaledVector(
+    dir,
+    dt*(7+Math.min(5,detection*5))
+   );
+
+   shark.lookAt(player.pos);
+  }
+
+  if(dist<8 && sharkState.cooldown<=0){
+
+   state.health-=18;
+   sharkState.cooldown=2.2;
+
+   const damage=document.getElementById("damage");
+   damage.style.opacity=.9;
+
+   setTimeout(()=>damage.style.opacity=0,160);
+
+   if(state.health<=0){
+    die(
+     "SHARK ENCOUNTER",
+     "Your health reached zero. Return to the Ark and try again."
+    );
+   }
+  }
+
+ }else{
+
+  shark.position.x=Math.sin(state.time*.15)*45;
+  shark.position.y=-14+Math.sin(state.time*.35)*7;
+  shark.position.z=-90+Math.cos(state.time*.13)*35;
+
+  shark.rotation.y=state.time*.15;
+ }
+}
+
+/* =========================================================
+   FISH AI
+========================================================= */
+
+function updateFish(dt){
+
+ fish.forEach((f,i)=>{
+
+  if(!f.visible)return;
+
+  const d=f.userData;
+
+  d.phase+=dt;
+
+  const steer=new THREE.Vector3();
+
+  /* school behaviour */
+  const schoolCenter=new THREE.Vector3(
+   Math.sin(state.time*.15)*15,
+   -10+Math.sin(state.time*.4)*4,
+   -65+Math.cos(state.time*.11)*25
+  );
+
+  steer.subVectors(schoolCenter,f.position).multiplyScalar(.15);
+  steer.add(d.dir);
+
+  /* avoid shark */
+  const sd=f.position.distanceTo(shark.position);
+
+  if(sd<20){
+   steer.add(
+    new THREE.Vector3().subVectors(
+     f.position,shark.position
+    ).normalize().multiplyScalar(3)
+   );
+  }
+
+  d.dir.lerp(steer.normalize(),.02);
+
+  f.position.addScaledVector(d.dir,dt*d.speed);
+
+  f.rotation.y=Math.atan2(d.dir.x,d.dir.z);
+
+  f.position.y+=Math.sin(d.phase*2+i)*dt*.2;
+ });
+}
+
+/* =========================================================
+   WATER ANIMATION
+========================================================= */
+
+function updateWater(){
+
+ const pos=water.geometry.attributes.position;
+
+ for(let i=0;i<pos.count;i++){
+
+  const x=waterBase[i*3];
+  const z=waterBase[i*3+2];
+
+  pos.array[i*3+1]=
+   Math.sin(x*.08+state.time*1.5)*.12+
+   Math.cos(z*.06+state.time)*.08;
+ }
+
+ pos.needsUpdate=true;
+ water.geometry.computeVertexNormals();
+}
+
+/* =========================================================
+   UNDERWATER ATMOSPHERE
+========================================================= */
+
+function updateAtmosphere(){
+
+ if(state.underwater){
+
+  const depth=Math.max(0,-player.pos.y);
+
+  scene.fog.color.setRGB(
+   .015,
+   .12-Math.min(.08,depth*.0005),
+   .16
+  );
+
+  scene.fog.density=.018+depth*.00018;
+
+  hemi.intensity=Math.max(.35,1.3-depth*.006);
+
+ }else{
+
+  scene.fog.color.setHex(0x071a21);
+  scene.fog.density=.009;
+  hemi.intensity=1.5;
+ }
+}
+
+/* =========================================================
+   DEATH / RESPAWN
+========================================================= */
+
+function die(title,text){
+
+ state.dead=true;
+
+ flashMessage(title,text);
+
+ document.getElementById("messageBtn").onclick=()=>{
+  document.getElementById("message").classList.add("hidden");
+
+  state.health=100;
+  state.oxygen=100;
+  state.dead=false;
+
+  player.pos.set(0,3,50);
+  player.vel.set(0,0,0);
+
+  shark.position.set(0,-14,-95);
+ };
+}
+
+/* =========================================================
+   INTERACTION PROMPT
+========================================================= */
+
+function updatePrompt(){
+
+ const target=getTarget();
+
+ const el=document.getElementById("interact");
+
+ if(target && state.started){
+  el.style.display="block";
+
+  if(target.userData.type==="trash")
+   el.textContent="USE — CLEAN TRASH";
+
+  else if(target.userData.type==="water")
+   el.textContent="USE — CHECK MONITOR";
+
+  else if(target.userData.type==="coralDamaged")
+   el.textContent="HOLD/USE — RESTORE CORAL";
+
+  else
+   el.textContent="INTERACT";
+
+ }else{
+  el.style.display="none";
+ }
+}
+
+/* =========================================================
+   CONTINUOUS TASK COMPLETION
+========================================================= */
+
+function checkCompletion(){
+
+ if(
+  state.trash>=state.trashTotal &&
+  state.water &&
+  state.coral>=state.coralTotal &&
+  !state.reef
+ ){
+  state.reef=true;
+  state.credits+=250;
+
+  flashMessage(
+   "OCEAN RESTORED",
+   "The coral reef has recovered and the Ocean Biome is stabilising. +250 credits."
+  );
+ }
+}
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+
+/* =========================================================
+   INITIAL SPAWN
+========================================================= */
+
+function setupFish(){
+ fish.length=0;
+ for(let i=0;i<quality[state.quality].fish;i++)makeFish(i);
+}
+
+setupFish();
+applyQuality();
+updateHUD();
+
+/* =========================================================
+   GAME LOOP
+========================================================= */
+
+let last=performance.now();
+
+function animate(now){
+
+ requestAnimationFrame(animate);
+
+ const dt=Math.min(.05,(now-last)/1000);
+ last=now;
+
+ state.time+=dt;
+
+ updatePlayer(dt);
+ updateOxygen(dt);
+ updateBiome(dt);
+ updateShark(dt);
+ updateFish(dt);
+ updateWater();
+ updateAtmosphere();
+ updateZone();
+ updatePrompt();
+ checkCompletion();
+ updateHUD();
+
+ renderer.render(scene,camera);
+}
+
+animate(performance.now());
+
+/* =========================================================
+   MOBILE SHOP BUTTON VISIBILITY
+========================================================= */
+
+setInterval(()=>{
+ document.getElementById("shopBtn").style.opacity=
+  state.started?1:.4;
+},500);
+
+</script>
+</body>
+  </html>
